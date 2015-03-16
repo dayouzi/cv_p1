@@ -1,0 +1,46 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+from __future__ import division
+from prepro import *
+import collections, os, sys
+from util import getArgMap
+from collections import *
+from sklearn.metrics import confusion_matrix
+
+argMap = getArgMap(sys.argv[1:])
+suffix = argMap.get('-s','')#suffix of training and testing files
+number = argMap.get('-n','')#number of cats
+base_path = '../corpus/vis'+number+'catfiles/'
+feat_suffix = argMap.get('-f','')
+
+def getConfMatrix():
+    y_true, y_pre = [],[]
+    r = open(base_path+'test_'+suffix+'_'+feat_suffix)
+    for line in r:
+    	y_true.append(int(line.split()[0]))
+    r = open(base_path+suffix+'_'+feat_suffix+'_output')
+    for line in r:
+    	y_pre.append(int(line))
+    cm = confusion_matrix(y_true, y_pre)
+    print cm
+    
+def genLabels():
+    catID = 0
+    w = open(base_path+'labels.dat','w')
+    cats = [];label = defaultdict(int)
+    for cat in os.listdir(base_path):
+    	if os.path .isfile(base_path+cat):
+    	    continue
+    	w.write(str(cat)+'\n')
+    	
+    	if str(cat) not in cats:
+    	    cats.append(str(cat))
+    	for img in os.listdir(base_path+cat):
+    	    imID = img.split('.')[0]
+    	    imFmt = img.split('.')[1]
+    	    if not imID.isdigit():
+    	    	continue
+    	    label[int(imID)] = int(catID)
+    	    w.write(str(catID)+' '+imID+'\n')
+    	catID = catID + 1
+    return label

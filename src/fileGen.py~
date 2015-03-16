@@ -1,0 +1,138 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+from __future__ import division
+from prepro import *
+import collections, os, sys
+from util import getArgMap
+from collections import *
+from sklearn.metrics import confusion_matrix
+
+argMap = getArgMap(sys.argv[1:])
+#catname = argMap.get('-b','')
+suffix = argMap.get('-s','')    
+number = argMap.get('-n','')
+base_path = '../corpus/vis'+number+'catfiles/'
+feat_suffix = argMap.get('-f','0')
+def getConfMatrix():
+    y_true, y_pre = [],[]
+    r = open(base_path+'test_'+feat_suffix+suffix)
+    for line in r:
+    	y_true.append(int(line.split()[0]))
+    r = open(base_path+feat_suffix+'_output'+suffix)
+    for line in r:
+    	y_pre.append(int(line))
+    cm = confusion_matrix(y_true, y_pre)
+    print cm
+def genLabels():
+    catID = 0
+    w = open(base_path+'labels.dat','w')
+    cats = [];label = defaultdict(int)
+    for cat in os.listdir(base_path):
+    	if os.path .isfile(base_path+cat):
+    	    continue
+    	w.write(str(cat)+'\n')
+    	
+    	if str(cat) not in cats:
+    	    cats.append(str(cat))
+    	for img in os.listdir(base_path+cat):
+    	    #print str(img)
+    	    imID = img.split('.')[0]
+    	    imFmt = img.split('.')[1]
+    	    if not imID.isdigit() or imFmt == 'gif':
+    	    	continue
+    	    label[int(imID)] = int(catID)
+    	    w.write(str(catID)+' '+imID+'\n')
+    	catID = catID + 1
+    return label
+def genFeat(numCenter):
+    
+    r = open(base_path+'assg.dat','r')
+    temp =  [0 for i in xrange(numCenter)]
+    feat = defaultdict(lambda: defaultdict(int))
+    for line in r:
+    	imgID = int(line.split('\t')[0]);centerID = int(line.split('\t')[1].strip())
+    	feat[imgID][centerID] = feat[imgID][centerID]+1
+    for i in sorted(feat.keys()):
+    	print str(i)+'\t',
+    	for c in xrange(numCenter):
+    	    print str(feat[i][c])+'\t',
+    	print '\n'
+    	
+def genFeatFile(numCenter):
+    label = genLabels()
+    r = open(base_path+'assg_'+suffix+'.dat','r')
+    w = open(base_path+'features_'+suffix,'w')
+    #temp =  [0 for i in xrange(numCenter)]
+    feat = defaultdict(lambda: defaultdict(int))
+    for line in r:
+    	if len(line.split('\t')) < 2:
+    	    continue
+    	imgID = int(line.split('\t')[0]);centerID = int(line.split('\t')[1].strip())
+    	feat[imgID][centerID-1] = feat[imgID][centerID-1]+1
+    
+    for i in sorted(feat.keys()):
+    	if i not in label.keys():
+    	    #print i
+    	    continue
+    	w.write( str(label[i])+'\t')
+    	w.write('\t'.join(str(feat[i][c]) for c in xrange(numCenter)))
+    	w.write('\n')
+   	
+def genTrainTestFiles(x,y,target='',samplingMethod = 'oversampling',folds=5):
+    train_file = base_path + 'train_'+target+'all_'+suffix
+    test_file = base_path + 'test_'+ target+'all_'+suffix
+    lnew = sampling(y,'undersampling')
+    X_new,y_new = [],[]
+    for l in lnew:
+    	for i in lnew[l]:
+    	    X_new.append(x[i])
+    	    y_new.append(y[i])
+    saveFile2(train_file,test_file,X_new,[],y_new,[],1)  
+    skf = StratifiedKFold(y, n_folds=5, shuffle = True)
+    k=0
+    for train_index, test_index in skf:
+    	train_file = base_path + 'train_'+str(k)+target+'_'+suffix
+    	test_file = base_path + 'test_'+ str(k)+target+'_'+suffix
+    	k=k+1
+    	print k
+    	X_test =  x[test_index]
+    	y_train, y_test = y[train_index], y[test_index]
+    	lnew_train = sampling(y_train,samplingMethod)
+    	#lnew_test = sampling(y_test,samplingMethod)
+    	X_train, y_train = [],[]
+    	#X_test, y_test = [],[]
+    	for l in lnew_train:
+    	    for i in lnew_train[l]:
+    	    	X_train.append(x[train_index][i])
+    	    	y_train.append(y[train_index][i])
+    	'''
+    	for l in lnew_test:
+    	    for i in lnew_test[l]:
+    	    	X_test.append(x[test_index][i])
+    	    	y_test.append(y[test_index][i])
+    	'''
+    	saveFile2(train_file,test_file,X_train,X_test,y_train,y_test,1)   
+def genBinTrainTestFiles(x,y):
+    for yy in set(y):
+    	#print yy
+    	c1,c2=0,0
+    	
+    	y_new = multi2bin(yy,y)
+    	
+    	for k in y_new:
+    	    if k==1:
+    	    	c1=c1+1
+    	    elif k==0:
+    	    	c2=c2+1
+    	print c1,c2
+    	#print y
+    	genTrainTestFiles(x,y_new,'_'+str(int(yy)))
+if __name__ == "__main__":
+    
+    genFeatFile(100)
+    data_file = base_path+'features_'+suffix
+    x,y,labels = readFile(data_file,'\t',0)
+    genTrainTestFiles(x,y,'','None')
+    genBinTrainTestFiles(x,y)
+    
+    #getConfMatrix()

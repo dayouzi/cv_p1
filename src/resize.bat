@@ -1,0 +1,1 @@
+for %%I in (*.jpeg) do convert -resize "1600x1600>" %%I  %%~nI.jpeg
